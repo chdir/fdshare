@@ -1,0 +1,93 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:1.1.1'
+    }
+}
+apply plugin: 'com.android.library'
+apply plugin: 'me.tatarka.retrolambda'
+
+repositories {
+    jcenter()
+}
+
+android {
+    compileSdkVersion 19 // mainly for try-with-resources
+    buildToolsVersion "22.0.1"
+
+    sourceSets.main.jni.srcDirs = []
+
+    defaultConfig {
+        minSdkVersion 3
+        //noinspection OldTargetApi
+        targetSdkVersion 21
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    buildTypes {
+        debug {
+            jniDebuggable true
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+import org.apache.tools.ant.taskdefs.condition.Os
+
+def buildCmd = Os.isFamily(Os.FAMILY_WINDOWS) ? 'ndk-build.cmd' : 'ndk-build'
+
+tasks.addRule("NDK tasks") { String taskName ->
+    def matcher = taskName =~ /fdshareBuildPie(.+)/
+
+    if (matcher) {
+        def usePie = matcher.group(1) == 'Enabled'
+
+        task(type: Exec, taskName) {
+            doFirst {
+                exec {
+                    commandLine buildCmd, '-C', "$projectDir.absolutePath/src/main/", 'clean'
+                }
+            }
+
+            commandLine buildCmd, '-C', "$projectDir.absolutePath/src/main/", "APP_PIE=$usePie"
+
+            doLast {
+                project.copy {
+                    from "$projectDir.absolutePath/src/main/libs"
+                    into "$projectDir.absolutePath/src/main/jniLibs"
+                    include '**/*'
+                    exclude '**/*.so'
+                    exclude '**/*.jar'
+                    rename(/(.+)/, usePie ? 'lib$1_PIC_exec.so' : 'lib$1_exec.so')
+                }
+            }
+        }
+    }
+}
+
+tasks.withType(JavaCompile).all {
+    it.dependsOn fdshareBuildPieEnabled, fdshareBuildPieDisabled
+}
+
+dependencies {
+    retrolambdaConfig 'net.orfjackal.retrolambda:retrolambda:1.8.0'
+    androidTestCompile 'junit:junit:4.11'
+    androidTestCompile('com.android.support.test:testing-support-lib:0.1') {
+        exclude group: 'junit'  // junit:junit-dep conflicts with junit:unit
+    }
+}

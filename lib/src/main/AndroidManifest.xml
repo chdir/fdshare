@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools"
+          package="net.sf.fdshare">
+    <uses-sdk tools:overrideLibrary="android.test.runner,com.android.support.test"/>
+
+    <application/>
+</manifest>
