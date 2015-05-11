@@ -10,7 +10,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name" >
         <activity
-            android:name=".MainActivity"
+            android:name="net.sf.fdshare.MainActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop">
             <intent-filter>
@@ -20,7 +20,7 @@
         </activity>
 
         <provider
-            android:name=".RootFileProvider"
+            android:name="net.sf.fdshare.RootFileProvider"
             android:authorities="net.sf.fdshare.provider"
             android:enabled="true"
             android:exported="false"

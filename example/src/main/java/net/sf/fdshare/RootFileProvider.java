@@ -1,16 +1,18 @@
-package net.sf.mymodule.example;
+package net.sf.fdshare;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.LruCache;
 import android.webkit.MimeTypeMap;
 import net.sf.fdshare.ConnectionBrokenException;
@@ -20,26 +22,21 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 public class RootFileProvider extends ContentProvider {
     public static final String AUTHORITY = "net.sf.fdshare.provider";
+
+    private static final String TAG = "RootFileProvider";
 
     private static final MimeTypeMap map = MimeTypeMap.getSingleton();
 
     private volatile FileDescriptorFactory fdfactory;
 
-    public RootFileProvider() {
-    }
-
     @Override
     public boolean onCreate() {
-        // _do not_ attempt to create a factory or check for root access here
         return true;
-    }
-
-    @Override
-    public ParcelFileDescriptor openFile(Uri uri, String mode, CancellationSignal signal) throws FileNotFoundException {
-        return super.openFile(uri, mode, signal);
     }
 
     @Override
@@ -51,37 +48,22 @@ public class RootFileProvider extends ContentProvider {
         try {
             if (fdfactory == null) {
                 synchronized (this) {
-                    fdfactory = FileDescriptorFactory.create(getContext());
+                    fdfactory = FileDescriptorFactory.DEBUG
+                            ? FileDescriptorFactory.createTest(getContext())
+                            : FileDescriptorFactory.create(getContext());
                 }
             }
 
-            try {
-                return fdfactory.open(f);
-            } catch (ConnectionBrokenException e) {
-                // something may have happened to the helper process (e.g. it was killed)
-                return reattemptWihtNewFactory(f);
-            }
-        } catch (Exception anything) {
-            throw new FileNotFoundException("Failed to open a file" +
-                    (TextUtils.isEmpty(anything.getMessage()) ? "" : " : " + anything.getMessage()));
-        }
-    }
-
-    private ParcelFileDescriptor reattemptWihtNewFactory(File f) throws IOException {
-        try {
-            fdfactory.close();
-            fdfactory = FileDescriptorFactory.create(getContext());
-            return fdfactory.open(f);
-        } catch (Exception hopeless) {
-            throw new IOException("Failed to re-initialize descriptor factory");
-        }
-    }
-
-    private void closeHelper() {
-        synchronized (this) {
-            fdfactory.close();
+            return fdfactory.open(f, parseMode(mode));
+        } catch (ConnectionBrokenException cbe) {
             fdfactory = null;
+
+            Log.e(TAG, "Failed to open a file, was helper process just killed?");
+        } catch (Exception anything) {
+            Log.e(TAG, "Failed to open a file or acquire root access");
         }
+
+        throw new FileNotFoundException("Failed to open a file");
     }
 
     @Override
@@ -99,6 +81,40 @@ public class RootFileProvider extends ContentProvider {
             return map.getMimeTypeFromExtension(maybeExtension);
         else
             return "text/plain";
+    }
+
+    private static @FileDescriptorFactory.OpenFlag int parseMode(String mode) {
+        int modeBits = 0;
+        boolean read = false, write = false;
+
+        for (char c:mode.toCharArray()) {
+            switch (c) {
+                case 'r':
+                    read = true;
+                    break;
+                case 'w':
+                    write = true;
+                    break;
+                case 'a':
+                    modeBits |= FileDescriptorFactory.O_APPEND;
+                    break;
+                case 't':
+                    modeBits |= FileDescriptorFactory.O_TRUNC;
+                    break;
+            }
+        }
+
+        if (write) {
+            modeBits |= FileDescriptorFactory.O_CREAT;
+
+            if (read)
+                modeBits |= FileDescriptorFactory.O_RDWR;
+            else
+                modeBits |= FileDescriptorFactory.O_WRONLY;
+        } else
+            modeBits |= FileDescriptorFactory.O_RDONLY;
+
+        return modeBits;
     }
 
     private static boolean compareMimeTypes(String concreteType, String desiredType) {
@@ -133,9 +149,7 @@ public class RootFileProvider extends ContentProvider {
 
         final MatrixCursor result = new MatrixCursor(projection);
 
-        try {
-            final ParcelFileDescriptor fd = openFile(uri, "rw");
-
+        try (ParcelFileDescriptor fd = openFile(uri, "rw")) {
             final Object[] row = new Object[projection.length];
             for (int i = 0; i < projection.length; i++) {
                 if (projection[i].compareToIgnoreCase(OpenableColumns.DISPLAY_NAME) == 0) {
@@ -143,41 +157,30 @@ public class RootFileProvider extends ContentProvider {
                 } else if (projection[i].compareToIgnoreCase(OpenableColumns.SIZE) == 0) {
                     final long fdsize = fd.getStatSize();
                     row[i] = fdsize >= 0 ? fdsize : null;
-                } else if (projection[i].compareToIgnoreCase(MediaStore.MediaColumns.MIME_TYPE)==0) {
+                } else if (projection[i].compareToIgnoreCase(MediaStore.MediaColumns.MIME_TYPE) == 0) {
                     row[i] = getType(uri);
                 }
             }
 
             result.addRow(row);
             return result;
-        } catch (FileNotFoundException e) {
+        } catch (IOException e) {
             return null;
         }
     }
 
     @Override
-    public void onLowMemory() {
-        super.onLowMemory();
-
-        closeHelper();
-    }
-
-    @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
-        // Implement this to handle requests to delete one or more rows.
-        throw new UnsupportedOperationException("Not yet implemented");
+        throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
     public Uri insert(Uri uri, ContentValues values) {
-        // TODO: Implement this to handle requests to insert a new row.
-        throw new UnsupportedOperationException("Not yet implemented");
+        throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
-    public int update(Uri uri, ContentValues values, String selection,
-                      String[] selectionArgs) {
-        // TODO: Implement this to handle requests to update one or more rows.
-        throw new UnsupportedOperationException("Not yet implemented");
+    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+        throw new UnsupportedOperationException("Not implemented");
     }
 }

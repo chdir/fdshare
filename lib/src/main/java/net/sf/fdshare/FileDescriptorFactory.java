@@ -41,7 +41,7 @@ import java.util.regex.Pattern;
  * <li> {@link java.nio.channels.FileChannel}
  * <li> {@link java.nio.channels.FileLock};
  * <li> {@link android.os.MemoryFile};
- * </ul>
+ * </ul>final EditText
  * and, probably, many others. The inner workings of {@link android.content.ContentProvider} and entire Android
  * Storage Access Framework are based on them as well.
  * <p>
@@ -136,6 +136,15 @@ public final class FileDescriptorFactory implements Closeable {
         final String address = UUID.randomUUID().toString();
 
         return create(address, "su", "-c", command + ' ' + address);
+    }
+
+    static FileDescriptorFactory createTest(Context context) throws IOException {
+        final String command = new File(context.getApplicationInfo().nativeLibraryDir,
+                System.mapLibraryName(EXEC_NAME)).getAbsolutePath();
+
+        final String address = UUID.randomUUID().toString();
+
+        return create(address, command, address);
     }
 
     static FileDescriptorFactory create(String address, String... cmd) throws IOException {

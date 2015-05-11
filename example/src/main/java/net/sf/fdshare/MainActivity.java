@@ -1,4 +1,4 @@
-package net.sf.mymodule.example;
+package net.sf.fdshare;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -21,14 +21,14 @@ public class MainActivity extends Activity implements DialogInterface.OnClickLis
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(net.sf.mymodule.example.R.layout.activity_main);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
 
-        final EditText txt = new EditText(this);
+        txt = new EditText(this);
         txt.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         txt.setHint("absolute path without quotes");
         txt.setSingleLine();
@@ -55,7 +55,7 @@ public class MainActivity extends Activity implements DialogInterface.OnClickLis
     public void onClick(DialogInterface dialogInterface, int i) {
         switch (i) {
             case DialogInterface.BUTTON_POSITIVE:
-                final Uri uri = Uri.fromParts("content", RootFileProvider.AUTHORITY, txt.getText().toString());
+                final Uri uri = Uri.parse("content://" + RootFileProvider.AUTHORITY + txt.getText().toString());
                 final Intent intent = new Intent(Intent.ACTION_EDIT);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.setData(uri);
