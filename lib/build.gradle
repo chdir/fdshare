@@ -20,9 +20,9 @@ android {
     sourceSets.main.jni.srcDirs = []
 
     defaultConfig {
-        minSdkVersion 3
-        //noinspection OldTargetApi
-        targetSdkVersion 21
+        minSdkVersion 8
+        //noinspection GradleDependency
+        targetSdkVersion 22
         versionCode 1
         versionName "1.0"
 
@@ -44,6 +44,16 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+
+    packagingOptions {
+        pickFirst 'LICENSE.txt'
+        pickFirst 'META-INF/ASL2.0'
+        pickFirst 'META-INF/LICENSE'
+        pickFirst 'META-INF/LICENSE.txt'
+        pickFirst 'META-INF/NOTICE'
+        exclude 'META-INF/services/javax.annotation.processing.Processor'
+        exclude 'META-INF/maven/*'
     }
 }
 
@@ -86,6 +96,9 @@ tasks.withType(JavaCompile).all {
 
 dependencies {
     retrolambdaConfig 'net.orfjackal.retrolambda:retrolambda:1.8.0'
+
+    compile 'com.android.support:support-annotations:21.0.0'
+
     androidTestCompile 'junit:junit:4.11'
     androidTestCompile('com.android.support.test:testing-support-lib:0.1') {
         exclude group: 'junit'  // junit:junit-dep conflicts with junit:unit

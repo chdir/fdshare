@@ -14,26 +14,28 @@
 
 #include <android/log.h>
 
-#define LOG_TAG "fdhelper"
+#define LOG_TAG "fdshare"
 
 void DieWithError(const char *errorMessage)  /* Error handling function */
 {
     const char* errDesc = strerror(errno);
-    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "%s errno %s(%d)", errorMessage, errDesc, errno);
+    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Failure: %s errno %s(%d)", errorMessage, errDesc, errno);
     fprintf(stderr, "Error: %s - %s\n", errorMessage, errDesc);
     exit(errno);
 }
 
-int ancil_send_fds_with_buffer(int sock, int fd, const char *buf)
+int ancil_send_fds_with_buffer(int sock, int fd)
 {
     struct msghdr msghdr;
     msghdr.msg_name = NULL;
     msghdr.msg_namelen = 0;
     msghdr.msg_flags = 0;
 
+    const char* success = "READY";
+
     struct iovec iovec;
-    iovec.iov_base = (void*) buf;
-    iovec.iov_len = sizeof(buf);
+    iovec.iov_base = (void*) success;
+    iovec.iov_len = sizeof(success) + 1;
 
     msghdr.msg_iov = &iovec;
     msghdr.msg_iovlen = 1;
@@ -58,7 +60,7 @@ int ancil_send_fds_with_buffer(int sock, int fd, const char *buf)
 // Fork and get ourselves a tty. Acquired tty will be new stdin,
 // Standard output streams will be redirected to new_stdouterr.
 // Returns control side tty file descriptor.
-int GetTTY(int new_stdouterr) {
+int GetTTY() {
     int masterFd = open("/dev/ptmx", O_RDWR);
     if (masterFd < 0)
         DieWithError("failed to open /dev/ptmx");
@@ -84,7 +86,7 @@ int GetTTY(int new_stdouterr) {
         DieWithError("fork() failed");
 
     if (pid) {
-        // tell the parent a PID of forked process
+        // tell creator the PID of forked process
         printf("PID:%d", pid);
         exit(0);
     } else {
@@ -99,8 +101,6 @@ int GetTTY(int new_stdouterr) {
         ioctl(pts, TIOCSCTTY, 0);
 
         dup2(pts, 0);
-        dup2(new_stdouterr, 1);
-        dup2(new_stdouterr, 2);
     }
 
     return masterFd;
@@ -111,7 +111,9 @@ int GetTTY(int new_stdouterr) {
 // and "GO" being received in response, which means, that the server process has acquired
 // file descriptor on the controlling terminal
 int Bootstrap(char *socket_name) {
-    int sock;
+    int tty, sock;
+
+    tty = GetTTY(sock);
 
     if ((sock = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0)
             DieWithError("socket() failed");
@@ -129,13 +131,17 @@ int Bootstrap(char *socket_name) {
     if (connect(sock, (struct sockaddr *) &echoServAddr, size) < 0)
         DieWithError("connect() failed");
 
-    int tty = GetTTY(sock);
+    dup2(sock, 1);
+    dup2(sock, 2);
 
-    if (ancil_send_fds_with_buffer(sock, tty, "READY"))
+    if (ancil_send_fds_with_buffer(sock, tty))
         DieWithError("sending tty descriptor failed");
 
-    if (scanf("GO") == 2) {
-        close(tty);
+    if (scanf("GO") == 0) {
+        if (close(tty))
+            DieWithError("failed to close controlling tty");
+
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "The controlling tty is closed");
     } else
         DieWithError("incomplete confirmation message");
 
@@ -156,22 +162,26 @@ int main(int argc, char *argv[]) {
         if (scanf("%d", &nameLength) != 1)
             DieWithError("reading a filename length failed");
 
-        char furtherFormat[20];
+        char furtherFormat[21];
 
-        sprintf(furtherFormat, "%ds,%%s", nameLength);
+        sprintf(furtherFormat, "%%%ds,%%d", nameLength);
+
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Format string is: %s", furtherFormat);
 
         char* filename;
         if ((filename = (char*) calloc(nameLength + 1, 1)) == NULL)
             DieWithError("calloc() failed");
 
-        char mode[4];
-        if (scanf(furtherFormat, filename, mode) != 1)
+        int mode;
+        if (scanf(furtherFormat, filename, &mode) != 2)
             DieWithError("reading a filename/mode failed");
 
-        int targetFd = open(filename, 0);
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Attempting to open %s", filename);
+
+        int targetFd = open(filename, mode, S_IRWXU|S_IRWXG);
 
         if (targetFd > 0) {
-            if (ancil_send_fds_with_buffer(sock, targetFd, "DONE"))
+            if (ancil_send_fds_with_buffer(sock, targetFd))
                 DieWithError("sending file descriptor failed");
         } else {
             fprintf(stderr, "Error: failed to open a file - %s\n", strerror(errno));

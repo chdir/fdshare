@@ -6,6 +6,7 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
@@ -25,22 +26,20 @@ public class RootFileProvider extends ContentProvider {
 
     private static final MimeTypeMap map = MimeTypeMap.getSingleton();
 
-    private FileDescriptorFactory fdfactory;
+    private volatile FileDescriptorFactory fdfactory;
 
     public RootFileProvider() {
     }
 
     @Override
     public boolean onCreate() {
-        try {
-            fdfactory = FileDescriptorFactory.create(getContext());
+        // _do not_ attempt to create a factory or check for root access here
+        return true;
+    }
 
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-
-            return false;
-        }
+    @Override
+    public ParcelFileDescriptor openFile(Uri uri, String mode, CancellationSignal signal) throws FileNotFoundException {
+        return super.openFile(uri, mode, signal);
     }
 
     @Override
@@ -49,16 +48,22 @@ public class RootFileProvider extends ContentProvider {
             throw new FileNotFoundException();
 
         final File f = new File(uri.getPath());
-
         try {
+            if (fdfactory == null) {
+                synchronized (this) {
+                    fdfactory = FileDescriptorFactory.create(getContext());
+                }
+            }
+
             try {
                 return fdfactory.open(f);
             } catch (ConnectionBrokenException e) {
+                // something may have happened to the helper process (e.g. it was killed)
                 return reattemptWihtNewFactory(f);
             }
-        } catch (IOException ioe) {
+        } catch (Exception anything) {
             throw new FileNotFoundException("Failed to open a file" +
-                    (TextUtils.isEmpty(ioe.getMessage()) ? "" : " : " + ioe.getMessage()));
+                    (TextUtils.isEmpty(anything.getMessage()) ? "" : " : " + anything.getMessage()));
         }
     }
 
@@ -69,6 +74,13 @@ public class RootFileProvider extends ContentProvider {
             return fdfactory.open(f);
         } catch (Exception hopeless) {
             throw new IOException("Failed to re-initialize descriptor factory");
+        }
+    }
+
+    private void closeHelper() {
+        synchronized (this) {
+            fdfactory.close();
+            fdfactory = null;
         }
     }
 
@@ -141,6 +153,13 @@ public class RootFileProvider extends ContentProvider {
         } catch (FileNotFoundException e) {
             return null;
         }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+
+        closeHelper();
     }
 
     @Override
