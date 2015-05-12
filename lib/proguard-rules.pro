@@ -1,17 +1,31 @@
-# Add project specific ProGuard rules here.
-# By default, the flags in this file are appended to flags specified
-# in /opt/android-sdk/tools/proguard/proguard-android.txt
-# You can edit the include path and order by changing the proguardFiles
-# directive in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+-verbose
+-dontpreverify
 
-# Add any project specific keep options here:
+-renamesourcefileattribute SourceFile
+-keepattributes SourceFile,LineNumberTable,*Annotation*,InnerClasses,EnclosingMethod,Exceptions
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclassmembers
+-dontskipnonpubliclibraryclasses
+
+-obfuscationdictionary proguard-dict.txt
+
+-optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*,!code/allocation/variable
+-optimizationpasses 5
+
+-useuniqueclassmembernames
+
+-keepclassmembers class **.R$* {
+    public static <fields>;
+}
+
+-keep public class !net.sf.fdshare.BuildConfig,** {
+    public *;
+}
+
+-assumenosideeffects class * {
+    !public !private static FileDescriptorFactory createTest(android.content.Context);
+}
+
+# Retrolambda, per https://github.com/evant/gradle-retrolambda
+-dontwarn java.lang.invoke.*

@@ -56,7 +56,7 @@ public class MainActivity extends Activity implements DialogInterface.OnClickLis
         switch (i) {
             case DialogInterface.BUTTON_POSITIVE:
                 final Uri uri = Uri.parse("content://" + RootFileProvider.AUTHORITY + txt.getText().toString());
-                final Intent intent = new Intent(Intent.ACTION_EDIT);
+                final Intent intent = new Intent(Intent.ACTION_VIEW);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.setData(uri);
 

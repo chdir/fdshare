@@ -5,11 +5,11 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:1.2.2'
         classpath 'com.android.tools.build:builder-model:1.2.0'
-        //classpath 'com.android.tools.build:gradle-core:1.2.0'
     }
 }
 
 apply plugin: 'com.android.application'
+apply plugin: 'me.tatarka.retrolambda'
 
 repositories {
     jcenter()
@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId "net.sf.mymodule.example"
-        minSdkVersion 19
+        minSdkVersion 3
         targetSdkVersion 22
         versionCode 1
         versionName "1.0"

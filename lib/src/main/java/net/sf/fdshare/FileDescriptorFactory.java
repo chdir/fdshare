@@ -1,9 +1,9 @@
 package net.sf.fdshare;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
-import android.net.Uri;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.support.annotation.IntDef;
@@ -93,7 +93,7 @@ public final class FileDescriptorFactory implements Closeable {
             O_PATH,
             O_TRUNC
     }, flag = true)
-    public @interface OpenFlag {};
+    public @interface OpenFlag {}
 
     public static final int O_RDONLY = 0;
     public static final int O_WRONLY = 1;
@@ -130,17 +130,15 @@ public final class FileDescriptorFactory implements Closeable {
      * @throws IOException if creation of instance fails, such as due to IO error or failure to obtain root access
      */
     public static FileDescriptorFactory create(Context context) throws IOException {
-        final String command = new File(context.getApplicationInfo().nativeLibraryDir,
-                System.mapLibraryName(EXEC_NAME)).getAbsolutePath();
+        final String command = new File(FdCompat.libDir(context), System.mapLibraryName(EXEC_NAME)).getAbsolutePath();
 
         final String address = UUID.randomUUID().toString();
 
         return create(address, "su", "-c", command + ' ' + address);
     }
 
-    static FileDescriptorFactory createTest(Context context) throws IOException {
-        final String command = new File(context.getApplicationInfo().nativeLibraryDir,
-                System.mapLibraryName(EXEC_NAME)).getAbsolutePath();
+    public static FileDescriptorFactory createTest(Context context) throws IOException {
+        final String command = new File(FdCompat.libDir(context), System.mapLibraryName(EXEC_NAME)).getAbsolutePath();
 
         final String address = UUID.randomUUID().toString();
 
@@ -222,9 +220,9 @@ public final class FileDescriptorFactory implements Closeable {
 
         FdResp response;
         try {
-            if (intake.offer(request, 2500, TimeUnit.MILLISECONDS)) {
+            if (intake.offer(request, 20, TimeUnit.SECONDS)) {
                 while ((response = responses.poll(2500, TimeUnit.MILLISECONDS)) != null) {
-                    if (response.request != request) // cleanup the queue in case some callers were interrupted early
+                    if (response.request != request) // cleanup the queue in case previous caller was interrupted early
                         continue;
 
                     if (response.fd != null)
@@ -479,11 +477,17 @@ public final class FileDescriptorFactory implements Closeable {
 
 final class FdCompat {
     static ParcelFileDescriptor adopt(FileDescriptor fd) throws IOException {
-        return Build.VERSION.SDK_INT >= 13 ? FdCompat13.createFdInternal(fd) : createFdInternal(fd);
+        return Build.VERSION.SDK_INT < 13 ? createFdInternal(fd) : FdCompat13.createFdInternal(fd);
     }
 
     static ParcelFileDescriptor adopt(int fd) throws IOException {
-        return Build.VERSION.SDK_INT >= 13 ? FdCompat13.createFdInternal(fd) : createFdInternal(fd);
+        return Build.VERSION.SDK_INT < 13 ? createFdInternal(fd) : FdCompat13.createFdInternal(fd);
+    }
+
+    static File libDir(Context context) {
+        return Build.VERSION.SDK_INT < 9
+                ? new File(context.getApplicationInfo().dataDir, "lib")
+                : FdCompat9.libDir(context);
     }
 
     // classic Java FileDescriptor does not provide saner way to close itself, so...
@@ -499,7 +503,7 @@ final class FdCompat {
 
     private static void readCachedField() throws NoSuchFieldException {
         if (integerField == null) {
-            integerField = FileDescriptor.class.getField("descriptor");
+            integerField = FileDescriptor.class.getDeclaredField("descriptor");
             integerField.setAccessible(true);
         }
     }
@@ -541,6 +545,7 @@ final class FdCompat {
         }
     }
 
+    @TargetApi(13)
     private static class FdCompat13 {
         static ParcelFileDescriptor createFdInternal(FileDescriptor fd) throws IOException {
             final ParcelFileDescriptor result = ParcelFileDescriptor.dup(fd);
@@ -552,6 +557,13 @@ final class FdCompat {
 
         static ParcelFileDescriptor createFdInternal(int fd) {
             return ParcelFileDescriptor.adoptFd(fd);
+        }
+    }
+
+    @TargetApi(9)
+    private static class FdCompat9 {
+        public static File libDir(Context context) {
+            return new File(context.getApplicationInfo().nativeLibraryDir);
         }
     }
 }

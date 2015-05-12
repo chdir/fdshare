@@ -16,7 +16,7 @@
 
 #define LOG_TAG "fdshare"
 
-void DieWithError(const char *errorMessage)  /* Error handling function */
+static void DieWithError(const char *errorMessage)  /* Error handling function */
 {
     const char* errDesc = strerror(errno);
     __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Failure: %s errno %s(%d)", errorMessage, errDesc, errno);
@@ -24,7 +24,7 @@ void DieWithError(const char *errorMessage)  /* Error handling function */
     exit(errno);
 }
 
-int ancil_send_fds_with_buffer(int sock, int fd)
+static int ancil_send_fds_with_buffer(int sock, int fd)
 {
     struct msghdr msghdr;
     msghdr.msg_name = NULL;
@@ -60,7 +60,7 @@ int ancil_send_fds_with_buffer(int sock, int fd)
 // Fork and get ourselves a tty. Acquired tty will be new stdin,
 // Standard output streams will be redirected to new_stdouterr.
 // Returns control side tty file descriptor.
-int GetTTY() {
+static int GetTTY() {
     int masterFd = open("/dev/ptmx", O_RDWR);
     if (masterFd < 0)
         DieWithError("failed to open /dev/ptmx");
@@ -110,7 +110,7 @@ int GetTTY() {
 // The procedure ends with "READY" and tty file descriptor are sent over the socket
 // and "GO" being received in response, which means, that the server process has acquired
 // file descriptor on the controlling terminal
-int Bootstrap(char *socket_name) {
+static int Bootstrap(char *socket_name) {
     int tty, sock;
 
     tty = GetTTY(sock);

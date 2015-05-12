@@ -20,7 +20,7 @@ android {
     sourceSets.main.jni.srcDirs = []
 
     defaultConfig {
-        minSdkVersion 8
+        minSdkVersion 3
         //noinspection GradleDependency
         targetSdkVersion 22
         versionCode 1
@@ -42,7 +42,7 @@ android {
         }
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles 'proguard-rules.pro'
         }
     }
 

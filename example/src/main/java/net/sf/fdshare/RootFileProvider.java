@@ -117,7 +117,7 @@ public class RootFileProvider extends ContentProvider {
         return modeBits;
     }
 
-    private static boolean compareMimeTypes(String concreteType, String desiredType) {
+    static boolean compareMimeTypes(String concreteType, String desiredType) {
         final int typeLength = desiredType.length();
         if (typeLength == 3 && desiredType.equals("*/*")) {
             return true;
