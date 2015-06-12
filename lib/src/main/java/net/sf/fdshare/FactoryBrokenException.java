@@ -6,8 +6,8 @@ package net.sf.fdshare;
  * closing it again). Attempting to reuse already closed factory will result in
  * another instance of this exception being thrown.
  */
-public final class ConnectionBrokenException extends Exception {
-    ConnectionBrokenException(String reason) {
+public final class FactoryBrokenException extends Exception {
+    FactoryBrokenException(String reason) {
         super(reason);
     }
 }

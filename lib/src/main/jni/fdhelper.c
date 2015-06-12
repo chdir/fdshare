@@ -158,25 +158,27 @@ int main(int argc, char *argv[]) {
 
     while(1) {
         int nameLength;
-
         if (scanf("%d", &nameLength) != 1)
             DieWithError("reading a filename length failed");
 
-        char furtherFormat[21];
-
-        sprintf(furtherFormat, "%%%ds,%%d", nameLength);
-
-        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Format string is: %s", furtherFormat);
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Length is %d", nameLength);
 
         char* filename;
         if ((filename = (char*) calloc(nameLength + 1, 1)) == NULL)
             DieWithError("calloc() failed");
 
-        int mode;
-        if (scanf(furtherFormat, filename, &mode) != 2)
-            DieWithError("reading a filename/mode failed");
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Allocated %d - sized buffer", nameLength + 1);
+
+        if (fgets(filename, nameLength + 1, stdin) == NULL)
+            DieWithError("reading filename failed");
 
         __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Attempting to open %s", filename);
+
+        int mode;
+        if (scanf("%d", &mode) != 1)
+            DieWithError("reading a mode failed");
+
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Mode is %d", mode);
 
         int targetFd = open(filename, mode, S_IRWXU|S_IRWXG);
 
