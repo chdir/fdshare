@@ -1,26 +1,14 @@
-buildscript {
-    repositories {
-        jcenter()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:1.1.1'
-    }
-}
 apply plugin: 'com.android.library'
 apply plugin: 'me.tatarka.retrolambda'
 
-repositories {
-    jcenter()
-}
-
 android {
-    compileSdkVersion 19 // mainly for try-with-resources
-    buildToolsVersion "22.0.1"
+    compileSdkVersion 21 // mainly for try-with-resources
+    buildToolsVersion '22.0.1'
 
     sourceSets.main.jni.srcDirs = []
 
     defaultConfig {
-        minSdkVersion 3
+        minSdkVersion 8
         //noinspection GradleDependency
         targetSdkVersion 22
         versionCode 1
@@ -65,7 +53,7 @@ tasks.addRule("NDK tasks") { String taskName ->
     def matcher = taskName =~ /fdshareBuildPie(.+)/
 
     if (matcher) {
-        def usePie = matcher.group(1) == 'Enabled'
+        boolean usePie = matcher.group(1) == 'Enabled'
 
         task(type: Exec, taskName) {
             doFirst {
@@ -74,15 +62,17 @@ tasks.addRule("NDK tasks") { String taskName ->
                 }
             }
 
-            commandLine buildCmd, '-C', "$projectDir.absolutePath/src/main/", "APP_PIE=$usePie"
+            def flag = usePie ? 'LOCAL_CFLAGS=-DFDSHARE_LIBRARY' : 'LOCAL_CFLAGS=-DNO_PIC'
+
+            commandLine buildCmd, '-C', "$projectDir.absolutePath/src/main/", "APP_PIE=$usePie", flag
 
             doLast {
                 project.copy {
                     from "$projectDir.absolutePath/src/main/libs"
                     into "$projectDir.absolutePath/src/main/jniLibs"
                     include '**/*'
-                    exclude '**/*.so'
                     exclude '**/*.jar'
+                    exclude '**/*.so'
                     rename(/(.+)/, usePie ? 'lib$1_PIC_exec.so' : 'lib$1_exec.so')
                 }
             }

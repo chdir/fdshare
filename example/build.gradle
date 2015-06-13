@@ -1,9 +1,5 @@
 buildscript {
-    repositories {
-        jcenter()
-    }
     dependencies {
-        classpath 'com.android.tools.build:gradle:1.2.2'
         classpath 'com.android.tools.build:builder-model:1.2.0'
     }
 }
@@ -11,17 +7,13 @@ buildscript {
 apply plugin: 'com.android.application'
 apply plugin: 'me.tatarka.retrolambda'
 
-repositories {
-    jcenter()
-}
-
 android {
-    compileSdkVersion 22
-    buildToolsVersion "22.0.1"
+    compileSdkVersion 21
+    buildToolsVersion '22.0.1'
 
     defaultConfig {
         applicationId "net.sf.mymodule.example"
-        minSdkVersion 3
+        minSdkVersion 8
         targetSdkVersion 22
         versionCode 1
         versionName "1.0"
@@ -52,6 +44,8 @@ android {
 
 dependencies {
     compile project(':lib')
+    compile 'com.j256.simplemagic:simplemagic:1.6'
+    compile 'com.android.support:support-v4:22.1.1'
 
     androidTestCompile 'junit:junit:4.11'
     androidTestCompile('com.android.support.test:testing-support-lib:0.1') {

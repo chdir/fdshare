@@ -1,83 +1,108 @@
 package net.sf.fdshare;
 
 import android.app.Activity;
+import android.app.ActivityGroup;
 import android.app.AlertDialog;
+import android.app.Dialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.LabeledIntent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 
+@SuppressWarnings("ALL")
 public class MainActivity extends Activity implements DialogInterface.OnClickListener, DialogInterface.OnCancelListener {
-    private AlertDialog dialog;
-    private EditText txt;
+    private IntentHandler handler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(net.sf.mymodule.example.R.layout.activity_main);
+
+        handler = new IntentHandler(this, Intent.ACTION_VIEW, true);
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
+    protected void onResume() {
+        super.onResume();
 
-        txt = new EditText(this);
+        showDialog(0);
+    }
+
+    @Override
+    protected Dialog onCreateDialog(int id) {
+        final EditText txt = new EditText(this);
         txt.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         txt.setHint("absolute path without quotes");
         txt.setSingleLine();
 
-        dialog = new AlertDialog.Builder(this)
+        final AlertDialog dlg = new AlertDialog.Builder(this)
                 .setMessage("Enter file path")
                 .setPositiveButton("Open", this)
+                .setNeutralButton("Open with", this)
                 .setNegativeButton("Exit", this)
                 .setOnCancelListener(this)
                 .setView(txt)
-                .show();
+                .create();
+
+        dlg.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface dialog) {
+                dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> showChooser(txt.getText().toString(), true));
+                dlg.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> showChooser(txt.getText().toString(), false));
+            }
+        });
+        return dlg;
+    }
+
+    private void showChooser(String file, boolean fast) {
+        try {
+            file = new File(file).getCanonicalPath();
+        } catch (IOException ignore) {
+            // a proper implementation would use any means possible to resolve a path
+            // and fail if unsuccessful, but this tiny showcase won't include using
+            // root access to resolve otherwise inaccessible symlink
+        }
+
+        final Intent openIntent = handler.createIntentForFile(file, fast);
+
+        if (openIntent == null)
+            Toast.makeText(this, "Unable to open a file", Toast.LENGTH_LONG).show();
+        else
+            startActivity(openIntent);
     }
 
     @Override
-    protected void onStop() {
-        dialog.dismiss();
-        dialog = null;
-        txt = null;
+    protected void onPause() {
+        removeDialog(0);
 
-        super.onStop();
+        super.onPause();
+    }
+
+    @Override
+    public void finish() {
+        removeDialog(0);
+
+        super.finish();
     }
 
     @Override
     public void onClick(DialogInterface dialogInterface, int i) {
         switch (i) {
-            case DialogInterface.BUTTON_POSITIVE:
-                final Uri uri = Uri.parse("content://" + RootFileProvider.AUTHORITY + txt.getText().toString());
-                final Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                intent.setData(uri);
-
-                List<ResolveInfo> resInfoList = getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
-
-                if (resInfoList.isEmpty()) {
-                    Toast.makeText(this, "No activities for editing found", Toast.LENGTH_LONG).show();
-                    finish();
-                    return;
-                }
-
-                for (ResolveInfo resolveInfo : resInfoList) {
-                    String packageName = resolveInfo.activityInfo.packageName;
-                    grantUriPermission(packageName, uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                }
-
-                startActivity(Intent.createChooser(intent, "Edit file with"));
-                break;
             case DialogInterface.BUTTON_NEGATIVE:
-                dialogInterface.dismiss();
                 finish();
+                dialogInterface.dismiss();
                 break;
         }
     }

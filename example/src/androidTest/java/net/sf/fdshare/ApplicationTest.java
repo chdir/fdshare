@@ -24,7 +24,7 @@ public class ApplicationTest {
         System.setProperty(FileDescriptorFactory.DEBUG_MODE, "true");
     }
 
-    private final ContentResolver resolver;
+    /*private final ContentResolver resolver;
     private RootFileProvider provider = new RootFileProvider(); {
         final MockContentResolver fakeResolver = new MockContentResolver();
         provider.attachInfo(InstrumentationRegistry.getTargetContext(), null);
@@ -65,5 +65,10 @@ public class ApplicationTest {
                 Assert.assertEquals(fd.getStatSize(), reportedSize);
             }
         }
+    }*/
+
+    @Test
+    public void convertLibmagicCTS() {
+
     }
 }

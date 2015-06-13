@@ -22,22 +22,22 @@ public class ApplicationTest {
     }
 
     @Test(expected = IOException.class)
-    public void testUnableToOpenWellKnownFile() throws IOException, ConnectionBrokenException {
+    public void testUnableToOpenWellKnownFile() throws IOException, FactoryBrokenException {
         try (FileDescriptorFactory fdf = FileDescriptorFactory.createTest(InstrumentationRegistry.getContext()))
         {
             fdf.open(exec); // opening with default read-write permission will fail
         }
     }
 
-    @Test(expected = ConnectionBrokenException.class)
-    public void testReusingClosedThrows() throws IOException, ConnectionBrokenException {
+    @Test(expected = FactoryBrokenException.class)
+    public void testReusingClosedThrows() throws IOException, FactoryBrokenException {
         final FileDescriptorFactory fdf = FileDescriptorFactory.createTest(InstrumentationRegistry.getContext());
         fdf.close();
         fdf.open(exec, FileDescriptorFactory.O_RDONLY);
     }
 
     @Test
-    public void testAbleToOpenWellKnownFile() throws IOException, ConnectionBrokenException {
+    public void testAbleToOpenWellKnownFile() throws IOException, FactoryBrokenException {
         try (FileDescriptorFactory fdf = FileDescriptorFactory.createTest(InstrumentationRegistry.getContext()))
         {
             // opening with read-only permission must succeed
@@ -45,6 +45,13 @@ public class ApplicationTest {
 
             Assert.assertTrue(fd.getFileDescriptor().valid());
             Assert.assertEquals(fd.getStatSize(), exec.length());
+        }
+    }
+
+    @Test
+    public void getFdPathWorks() throws IOException {
+        try (ParcelFileDescriptor fd = ParcelFileDescriptor.open(exec, ParcelFileDescriptor.MODE_READ_ONLY)) {
+            Assert.assertEquals(FdUtils.getFdPath(fd), exec.getAbsolutePath());
         }
     }
 }
