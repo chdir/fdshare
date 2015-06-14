@@ -6,10 +6,12 @@ import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
+import android.support.annotation.NonNull;
 import android.support.v4.util.LruCache;
 import android.text.TextUtils;
 import android.util.Log;
@@ -17,6 +19,8 @@ import android.webkit.MimeTypeMap;
 import com.j256.simplemagic.ContentInfo;
 import com.j256.simplemagic.ContentInfoUtil;
 import com.j256.simplemagic.ContentType;
+import net.sf.mymodule.example.*;
+import net.sf.mymodule.example.BuildConfig;
 import org.w3c.dom.Text;
 
 import java.io.File;
@@ -27,6 +31,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.Timer;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -62,11 +67,15 @@ public abstract class BaseProvider extends ContentProvider {
 
     @Override
     public String getType(Uri uri) {
+        if (TextUtils.isEmpty(uri.getPath()))
+            return null;
+
         final String forcedType = uri.getQueryParameter("type");
         if (!TextUtils.isEmpty(forcedType)) {
             return "null".equals(forcedType) ? null : forcedType;
         } else {
-            return guessTypeInternal(uri.getPath()).mime[0];
+            final TimestampedMime guess = guessTypeInternal(uri.getPath());
+            return guess.mime.length == 0 ? null : guess.mime[0];
         }
     }
 
@@ -86,7 +95,7 @@ public abstract class BaseProvider extends ContentProvider {
 
     abstract ParcelFileDescriptor openDescriptor(String filePath, String mode) throws FileNotFoundException;
 
-    TimestampedMime guessTypeInternal(String filePath) {
+    @NonNull TimestampedMime guessTypeInternal(String filePath) {
         final TimestampedMime cachedResult = fileTypeCache.get(filePath);
 
         if (cachedResult != null && System.nanoTime() - cachedResult.when > 2_000_000_000)
@@ -156,6 +165,10 @@ public abstract class BaseProvider extends ContentProvider {
 
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+        final String filePath = uri.getPath();
+        if (TextUtils.isEmpty(filePath))
+            throw new IllegalArgumentException("Empty path!");
+
         if (projection == null) {
             projection = new String[] {
                     MediaStore.MediaColumns.MIME_TYPE,
@@ -166,7 +179,7 @@ public abstract class BaseProvider extends ContentProvider {
 
         final MatrixCursor result = new MatrixCursor(projection);
 
-        final TimestampedMime info = guessTypeInternal(uri.getPath());
+        final TimestampedMime info = guessTypeInternal(filePath);
 
         final Object[] row = new Object[projection.length];
         for (int i = 0; i < projection.length; i++) {

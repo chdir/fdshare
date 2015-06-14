@@ -9,11 +9,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 /**
- * A ContentProvider, that uses {@link ParcelFileDescriptor#open} to serve requests.
+ * A simple ContentProvider, using {@link ParcelFileDescriptor#open} to serve requests.
  *
- * Note, that opening Uri, pointing to a symlink is _NOT_ allowed: the caller must resolve those itself beforehand.
- * Additionally the caller must ensure that the user have been informed, which actual file is going to be open,
- * and supply the Uri of _THAT_ file in order to protect from symlink-based attacks.
+ * All paths, received by the provider must be absolute and canonical (fully resolved, without a single
+ * symlink). Use {@link File#getCanonicalPath()} to resolve paths before passing them to ContentResolver.
+ *
+ * Passing relative, non canonical or inaccessible paths will result in exception being thrown.
  */
 public class SimpleFilePorvider extends BaseProvider {
     private static final String TAG = "SimpleFileProvider";
@@ -24,16 +25,16 @@ public class SimpleFilePorvider extends BaseProvider {
     ParcelFileDescriptor openDescriptor(String filePath, String mode) throws FileNotFoundException {
         File aFile;
 
-        if (TextUtils.isEmpty(filePath) || !(aFile = new File(filePath)).exists())
+        if (TextUtils.isEmpty(filePath) || !(aFile = new File(filePath)).isAbsolute())
+            throw new IllegalArgumentException("Provide a fully qualified path!");
+
+        if (!aFile.exists())
             throw new FileNotFoundException();
 
         try {
-            // XXX: this is vulnerable to TOCTTOU attacks! An ideal solution would use JNI to check
-            // descriptor, returned by open() for being a symlink, or, better yet, open() should have
-            // used NO_FOLLOW by default in the first place. That said, who cares about symlink attacks,
-            // when device vendors disregard security updates for years...
-            if (isSymlink(aFile))
-                throw new FileNotFoundException("Symlinks are not allowed!");
+            // TODO: do something about the TOCTOU condition here
+            if (!aFile.equals(aFile.getCanonicalFile()))
+                throw new IllegalArgumentException("Provide a fully resolved canonical path!");
 
             return ParcelFileDescriptor.open(aFile, modeToMode(mode));
         } catch (IOException e) {
@@ -41,19 +42,6 @@ public class SimpleFilePorvider extends BaseProvider {
         }
 
         throw new FileNotFoundException("Failed to open a file");
-    }
-
-    private static boolean isSymlink(File file) throws IOException {
-        if (file == null)
-            throw new NullPointerException("File must not be null");
-        File canon;
-        if (file.getParent() == null) {
-            canon = file;
-        } else {
-            File canonDir = file.getParentFile().getCanonicalFile();
-            canon = new File(canonDir, file.getName());
-        }
-        return !canon.getCanonicalFile().equals(canon.getAbsoluteFile());
     }
 
     private static int modeToMode(String mode) throws FileNotFoundException {
