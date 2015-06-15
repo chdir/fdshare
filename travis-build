@@ -1,0 +1,19 @@
+#!/bin/bash -x
+ls -alh crystax-ndk-10.1.0 || true
+
+#if [ ! -f crystax-ndk-10.1.0 ]; then
+
+df -hu
+
+ if [ `uname -m` = x86_64 ]; then
+	NDK_URL=https://www.crystax.net/download/crystax-ndk-10.1.0-linux-x86_64.tar.bz2;
+ else
+	NDK_URL=https://www.crystax.net/download/crystax-ndk-10.1.0-linux-x86.tar.bz2;
+ fi
+
+ wget -qO- "$NDK_URL" | tar xvjf - crystax-ndk-10.1.0 --exclude=crystax-ndk-10.1.0/docs --exclude=crystax-ndk-10.1.0/sources --exclude=crystax-ndk-10.1.0/samples --exclude=crystax-ndk-10.1.0/tests --exclude=crystax-ndk-10.1.0/build --exclude=crystax-ndk-10.1.0/toolchains/renderscript --exclude=crystax-ndk-10.1.0/toolchains/x86_64-* --exclude=crystax-ndk-10.1.0/toolchains/llvm-* --exclude=crystax-ndk-10.1.0/toolchains/aarch64-* --exclude=crystax-ndk-10.1.0/toolchains/mips64el-*
+
+ ls -alh crystax-ndk-10.1.0 || true
+#fi
+
+echo ndk.dir=`pwd`/crystax-ndk-10.1.0 > local.properties

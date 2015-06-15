@@ -1,5 +1,6 @@
 package net.sf.fdshare;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.database.Cursor;
 import android.net.Uri;
@@ -36,6 +37,7 @@ public class RootFileProvider extends BaseProvider {
      * in such case.
      */
     @Override
+    @SuppressLint("NewApi")
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     public ParcelFileDescriptor openFile(Uri uri, String mode, CancellationSignal signal) throws FileNotFoundException {
         try (Closeable cancellation = new ThreadInterrupter(signal))
@@ -53,6 +55,7 @@ public class RootFileProvider extends BaseProvider {
      * in such case.
      */
     @Override
+    @SuppressLint("NewApi")
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal signal) {
         try (Closeable cancellation = new ThreadInterrupter(signal))

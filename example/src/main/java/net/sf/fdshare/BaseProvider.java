@@ -1,5 +1,6 @@
 package net.sf.fdshare;
 
+import android.annotation.SuppressLint;
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.res.AssetFileDescriptor;
@@ -95,6 +96,7 @@ public abstract class BaseProvider extends ContentProvider {
 
     abstract ParcelFileDescriptor openDescriptor(String filePath, String mode) throws FileNotFoundException;
 
+    @SuppressLint("NewApi")
     @NonNull TimestampedMime guessTypeInternal(String filePath) {
         final TimestampedMime cachedResult = fileTypeCache.get(filePath);
 
