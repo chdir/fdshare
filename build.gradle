@@ -1,16 +1,19 @@
 task wrapper (type:Wrapper) {
-    gradleVersion = '2.4'
-    distributionUrl = 'https://services.gradle.org/distributions/gradle-2.4-all.zip'
+    gradleVersion = '2.2.1'
+    distributionUrl = 'https://services.gradle.org/distributions/gradle-2.2.1-all.zip'
 }
 
 buildscript {
     repositories {
         jcenter()
+	mavenCentral()
     }
     dependencies {
         classpath 'com.jakewharton.sdkmanager:gradle-plugin:0.12.0'
         classpath 'com.android.tools.build:gradle:1.2.2'
-        classpath 'me.tatarka:gradle-retrolambda:2.5.0'
+	classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.0'
+        classpath 'com.github.dcendents:android-maven-plugin:1.2'
+        //classpath 'me.tatarka:gradle-retrolambda:2.5.0'
         classpath 'me.tatarka.retrolambda.projectlombok:lombok.ast:0.2.3.a2'
     }
 
@@ -38,4 +41,8 @@ subprojects {
             && (androidHome = androidHome as File).exists()
             && androidHome.canWrite())
         apply plugin: 'android-sdk-manager'
+
+    ext {
+        uploadInitiated  = gradle.startParameter.taskNames.contains('bintrayUpload')
+    }
 }

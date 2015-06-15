@@ -1,11 +1,29 @@
+import com.android.tools.lint.EcjParser
+
+long expectedValue = EcjParser.getLanguageLevel(1, 8)
+EcjParser.metaClass.'static'.getLanguageLevel = { int i, int j -> expectedValue }
+
 apply plugin: 'com.android.library'
+
 apply plugin: 'me.tatarka.retrolambda'
 
-android {
-    publishNonDefault true
+apply plugin: 'idea'
+idea {
 
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
+
+group = 'net.sf.fdshare'
+version = '0.2.1'
+
+android {
     compileSdkVersion 21 // mainly for try-with-resources
     buildToolsVersion '22.0.1'
+
+    publishNonDefault !uploadInitiated
 
     sourceSets.main.jni.srcDirs = []
 
@@ -47,6 +65,7 @@ android {
     }
 }
 
+
 import org.apache.tools.ant.taskdefs.condition.Os
 
 def buildCmd = Os.isFamily(Os.FAMILY_WINDOWS) ? 'ndk-build.cmd' : 'ndk-build'
@@ -86,6 +105,31 @@ tasks.withType(JavaCompile).all {
     it.dependsOn fdshareBuildPieEnabled, fdshareBuildPieDisabled
 }
 
+task sourcesJar(type: Jar) {
+    from android.sourceSets.main.java.srcDirs
+    classifier = 'sources'
+}
+
+task javadoc(type: Javadoc) {
+    source = android.sourceSets.main.java.srcDirs
+    classpath += configurations.compile
+    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives javadocJar
+    archives sourcesJar
+}
+
+task findConventions << {
+    println project.convention
+}
+
 dependencies {
     retrolambdaConfig 'net.orfjackal.retrolambda:retrolambda:1.8.0'
 
@@ -95,4 +139,9 @@ dependencies {
     androidTestCompile('com.android.support.test:testing-support-lib:0.1') {
         exclude group: 'junit'  // junit:junit-dep conflicts with junit:unit
     }
+}
+
+def maintGradleScript = file("$rootProject.projectDir/deployment.gradle")
+if (maintGradleScript.exists()) {
+    apply from: maintGradleScript
 }

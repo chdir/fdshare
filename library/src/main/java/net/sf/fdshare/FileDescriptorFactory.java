@@ -22,6 +22,8 @@ import java.io.RandomAccessFile;
 import java.io.Writer;
 import java.lang.Process;
 import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -118,18 +120,20 @@ public final class FileDescriptorFactory implements Closeable {
             O_TRUNC
     }, flag = true)
     @Documented
+    @Retention(RetentionPolicy.SOURCE)
     public @interface OpenFlag {}
 
-    public static final int O_RDONLY =      0b000000000000000000;
-    public static final int O_WRONLY =      0b000000000000000001;
-    public static final int O_RDWR =        0b000000000000000010;
+    int ff = 0x2000000;
+    public static final int O_RDONLY = 0; // 0b000000000000000000
+    public static final int O_WRONLY = 1; // 0b000000000000000001;
+    public static final int O_RDWR = 2;   // 0b000000000000000010;
 
-    public static final int O_APPEND =      0b0000000000010000000000; // 0x0008 on mips
-    public static final int O_CREAT =       0b0000000000000001000000;
-    public static final int O_DIRECTORY =   0b0000010000000000000000;
-    public static final int O_NOFOLLOW =    0b0000100000000000000000;
-    public static final int O_PATH =        0b1000000000000000000000;
-    public static final int O_TRUNC =       0b0000000000001000000000; // 0x0200 on mips
+    public static final int O_APPEND = 1024;     // 0b0000000000010000000000; // 0x0008 on mips
+    public static final int O_CREAT = 64;        // 0b0000000000000001000000; // 0x0100 on mips
+    public static final int O_DIRECTORY = 65536; // 0b0000010000000000000000;
+    public static final int O_NOFOLLOW = 131072; // 0b0000100000000000000000;
+    public static final int O_PATH = 2097152;    // 0b1000000000000000000000;
+    public static final int O_TRUNC = 512;       // 0b0000000000001000000000;
 
     private static final String FD_HELPER_TAG = "fdhelper";
 
@@ -153,10 +157,10 @@ public final class FileDescriptorFactory implements Closeable {
     /**
      * Create a FileDescriptorFactory, using an internally managed helper
      * process. The helper is run with superuser privileges via the "su"
-     * command, available on system's PATH. <br/>
+     * command, available on system's PATH.
      * <p>
      * The device has to be rooted. The "su" command must support
-     * {@code su -c "command with arguments"} syntax (most modern ones do). <br/>
+     * {@code su -c "command with arguments"} syntax (most modern ones do).
      * <p>
      * You are highly recommended to cache and reuse the returned instance.
      *
@@ -212,7 +216,7 @@ public final class FileDescriptorFactory implements Closeable {
      *
      * <p>
      *
-     * <b>Do not call this method from the main thread!<b/>
+     * <b>Do not call this method from the main thread!</b>
      *
      * @throws IOException recoverable error, such as when file was not found
      * @throws FactoryBrokenException irrecoverable error, that renders this factory instance unusable
@@ -227,7 +231,7 @@ public final class FileDescriptorFactory implements Closeable {
      *
      * <p>
      *
-     * <b>Do not call this method from the main thread!<b/>
+     * <b>Do not call this method from the main thread!</b>
      *
      * @param file the {@link File} object, with path to the target file, not necessarily accessible to your UID
      * @param mode either {@link #O_RDONLY}, {@link #O_WRONLY} or {@link #O_RDWR}, or-ed with other {@link OpenFlag} constants
@@ -320,7 +324,7 @@ public final class FileDescriptorFactory implements Closeable {
         @Override
         public void run() {
             try (ReadableByteChannel clientOutput = Channels.newChannel(client.getInputStream());
-                 Closeable c = serverSocket::close)
+                 Closeable c = new CloseableSocket(serverSocket))
             {
                 try {
                     initializeAndHandleRequests(readHelperPid(clientOutput), serverSocket);
@@ -517,6 +521,20 @@ public final class FileDescriptorFactory implements Closeable {
         @Override
         public String toString() {
             return "Request: " + request + ". Helper response: '" + message + "', descriptor: " + fd;
+        }
+    }
+
+    // workaround for some stupid bug in annotations extractor
+    private static class CloseableSocket implements Closeable {
+        private final LocalServerSocket lss;
+
+        public CloseableSocket(LocalServerSocket lss) {
+            this.lss = lss;
+        }
+
+        @Override
+        public void close() throws IOException {
+            lss.close();
         }
     }
 }

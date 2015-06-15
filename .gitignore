@@ -20,6 +20,7 @@ lib/src/main/obj/
 target
 build
 out
+obj/
 libs
 null
 tmp

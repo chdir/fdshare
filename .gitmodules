@@ -1,0 +1,3 @@
+[submodule "buildSrc/gradle-retrolambda"]
+	path = buildSrc/gradle-retrolambda
+	url = git@github.com:Alexander--/gradle-retrolambda.git

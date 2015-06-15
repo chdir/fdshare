@@ -1,0 +1,10 @@
+apply plugin: "java"
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+dependencies {
+   runtime project(':gradle-retrolambda')
+}

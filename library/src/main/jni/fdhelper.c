@@ -174,9 +174,20 @@ int main(int argc, char *argv[]) {
 
         __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Attempting to open %s", filename);
 
-        int mode;
+        const int mode;
         if (scanf("%d", &mode) != 1)
             DieWithError("reading a mode failed");
+
+        // freaking MIPS...
+        if (mode&0x400) {
+            mode ^= 0x400;
+            mode |= O_APPEND;
+        }
+
+        if (mode&0x40) {
+            mode ^= 0x40;
+            mode |= O_CREAT;
+        }
 
         __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Mode is %d", mode);
 

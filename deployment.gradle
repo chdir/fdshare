@@ -1,0 +1,77 @@
+apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'com.jfrog.bintray'
+
+def packageDesc = 'An Open Server for Android: open files as root -> pass descriptors to VM -> reap the benefits'
+def packageSite = 'https://github.com/Alexander--/fdshare'
+def mainLic = 'Apache-2.0'
+def libVcs = 'https://github.com/Alexander--/fdshare.git'
+
+def props = new Properties()
+
+def propFile
+def propName = System.env.MAINTAINER_PROPS
+if(propName && (propFile = file(propName)).exists()) {
+    new FileInputStream(propFile).withStream { InputStream is ->
+        props.load(is)
+    }
+}
+
+if (props) {
+    apply plugin: 'com.github.dcendents.android-maven'
+    apply plugin: 'com.jfrog.bintray'
+
+    bintray {
+        user = props['bintrayUser']
+        key = props['bintrayKey']
+        configurations = ['archives']
+
+        pkg {
+            repo = 'maven'
+            name = 'fdshare'
+            desc = packageDesc
+            websiteUrl = packageSite
+            issueTrackerUrl = 'https://github.com/Alexander--/fdshare/issues'
+            vcsUrl = libVcs
+            licenses = [mainLic]
+            labels = ['open server', 'android', 'root', 'descriptor passing']
+            publicDownloadNumbers = true
+
+            version {
+                name = project.version
+                vcsTag = "v${name}"
+            }
+
+            publish = true
+        }
+    }
+
+    install {
+        repositories.mavenInstaller {
+            pom {
+                project {
+                    packaging 'aar'
+                    name packageDesc
+                    url packageSite
+                    licenses {
+                        license {
+                            name 'The Apache Software License, Version 2.0'
+                            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id 'alexanderr'
+                            name 'AlexanderR'
+                            email 'alexander.r@gmx.com'
+                        }
+                    }
+                    scm {
+                        connection libVcs
+                        developerConnection libVcs
+                        url packageSite
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,8 +1,10 @@
 buildscript {
     dependencies {
-        classpath 'com.android.tools.build:builder-model:1.2.0'
+        classpath 'com.android.tools.build:builder-model:1.2.2'
     }
 }
+
+repositories { maven { url "http://dl.bintray.com/alexanderr/maven" } }
 
 apply plugin: 'com.android.application'
 apply plugin: 'me.tatarka.retrolambda'
@@ -42,8 +44,12 @@ android {
 }
 
 dependencies {
-    releaseCompile project(path: ':lib', configuration: 'release')
-    debugCompile project(path: ':lib', configuration: 'debug')
+    if (uploadInitiated) {
+        compile project(':library')
+    } else {
+        debugCompile project(path: ':library', configuration: 'debug')
+        releaseCompile 'net.sf.fdshare:library:0.2.1@aar'
+    }
 
     compile 'com.j256.simplemagic:simplemagic:1.6'
     compile 'com.android.support:support-v4:22.1.1'
