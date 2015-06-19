@@ -67,14 +67,12 @@ dependencies {
 }
 ```
 
-and following repository (will be added to JCenter soon):
+also make sure, that jCenter is enabled in repository settings:
 
 ```groovy
 repositories {
     ...
-    maven {
-        url "http://dl.bintray.com/alexanderr/maven"
-    }
+    jcenter()
 }
 ```
 
