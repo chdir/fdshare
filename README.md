@@ -22,7 +22,8 @@ Context context = ...
 try (FileDescriptorFactory factory = FileDescriptorFactory.create(context);
      RandomAccessFile file = factory.openRandomAccessFile("/system/etc/hosts"))
 {
-    MappedByteBuffer mappedFile = file.getChannel().map(MapMode.READ_WRITE, 0, file.size);
+    Channel ch = file.getChannel();
+    MappedByteBuffer mappedFile = ch.map(MapMode.READ_WRITE, 0, file.size);
 
     // you can do whatever you like now!
 } catch (FactoryBrokenException oups) {
@@ -43,32 +44,51 @@ Wait, so what is this library for?
 In short this library allows one to leverage root access for:
 
 * Opening arbitrary files and working with their contents;
-* Writing a `ContentProvider`, that offers access to arbitrary files in file system to other processes;
+* Writing a ContentProvider, that offers access to arbitrary files in file system to other processes;
 * Opening privileged (below 1024) network ports;
 * Hijacking files, pipes and sockets, open by other processes;
 
-all of that without invoking `busybox`, `sh` or like, without moving one's app to `/system/app-priv/` and
-without writing custom native binaries to launch with `su`. If you don't understand, how is this possible,
+all of that without invoking *busybox*, *sh* or like, without moving one's app to */system/app-priv/* and
+without writing custom native binaries to launch with *su*. If you don't understand, how is this possible,
 you may want to read a bit about [Unix file descriptors](https://en.wikipedia.org/wiki/File_descriptor), as
 well as their use in Android (I recommend familiarizing yourself with [this post][2], concerning the later).
 
 Usage
 ======
-// TODO: see source code for detailed documentation
+
+Add following dependency to your `dependencies` block:
+
+```groovy
+dependencies {
+    ...
+    compile 'net.sf.fdshare:library:0.2.1@aar'
+}
+```
+
+and following repository (will be added to JCenter soon):
+
+```groovy
+repositories {
+    ...
+    maven {
+        url "http://dl.bintray.com/alexanderr/maven"
+    }
+}
+```
 
 Interruption and timeouts
 ==========================
 
-`open`-ing things with this library may take unpredictable amount of time, depending on countless factors, which are
+Opening things with this library may take unpredictable amount of time, depending on countless factors, which are
 impossible to predict in advance (e.g., how long will it take for user to grant a root access via permission
 request dialog?) In order to work around this complication the library uses a 20-second timeout for each call
-to `open`, resulting in `FactoryBrokenException` if exceeded. It is longer then analogous timeout, used
+to `open`, resulting in FactoryBrokenException if exceeded. It is longer then analogous timeout, used
 for similar reasons by [SuperSu], and should be sufficient for all practical purposes. You can adjust it to
 your liking by setting system property `FileDescriptorFactory#PRIMARY_TIMEOUT`.
 
 If you want to cancel the call to `open` prematurely, just interrupt the thread, that does it
-(by calling `interrupt` on the Thread,  cancelling the AsyncTask, unsubscribing from Observable etc.)
-Doing so will result in `IOException` being immediately thrown (but the corresponding file may still be open
+(by interrupting on the Thread,  cancelling the AsyncTask, unsubscribing from Observable etc.)
+Doing so will result in IOException being immediately thrown (but the corresponding file may still be open
 in background, only to be closed immediately).
 
 Compatibility
@@ -84,6 +104,6 @@ License
 
 This library is licensed under the Apache License, Version 2.0, see LICENSE file for more details.
 
-[1] - http://www.apuebook.com
-[2] - https://stackoverflow.com/a/30283769/1643723
-[3] - http://forum.xda-developers.com/apps/supersu
+[1]: http://www.apuebook.com
+[2]: https://stackoverflow.com/a/30283769/1643723
+[3]: http://forum.xda-developers.com/apps/supersu
