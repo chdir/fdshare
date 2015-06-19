@@ -49,9 +49,11 @@ In short this library allows one to leverage root access for:
 * Hijacking files, pipes and sockets, open by other processes;
 
 all of that without invoking *busybox*, *sh* or like, without moving one's app to */system/app-priv/* and
-without writing custom native binaries to launch with *su*. If you don't understand, how is this possible,
-you may want to read a bit about [Unix file descriptors](https://en.wikipedia.org/wiki/File_descriptor), as
-well as their use in Android (I recommend familiarizing yourself with [this post][2], concerning the later).
+without writing custom native binaries to launch with *su*. Your app's process does not need to run with
+any special rights (such as rooted Dalvik instance etc.), but the device itself must be rooted.
+
+If you don't understand, how is this possible, you may want to read a bit about [Unix file descriptors](https://en.wikipedia.org/wiki/File_descriptor),
+as well as their use in Android (I recommend familiarizing yourself with [this post][2], concerning the later).
 
 Usage
 ======

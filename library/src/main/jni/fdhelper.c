@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
 
         __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Attempting to open %s", filename);
 
-        const int mode;
+        int mode;
         if (scanf("%d", &mode) != 1)
             DieWithError("reading a mode failed");
 
