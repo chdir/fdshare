@@ -208,6 +208,7 @@ public final class FileDescriptorFactory implements Closeable {
     }
 
     private final AtomicBoolean closedStatus = new AtomicBoolean(false);
+    private final AtomicBoolean suAuthPassed = new AtomicBoolean(false);
     private final SynchronousQueue<FdReq> intake = new SynchronousQueue<>();
     private final SynchronousQueue<FdResp> responses = new SynchronousQueue<>();
 
@@ -278,6 +279,8 @@ public final class FileDescriptorFactory implements Closeable {
         try {
             if (intake.offer(request, HELPER_TIMEOUT, TimeUnit.MILLISECONDS)) {
                 while ((response = responses.poll(IO_TIMEOUT, TimeUnit.MILLISECONDS)) != null) {
+                    FdCompat.set(suAuthPassed);
+
                     if (response.request != request) { // cleanup the queue in case previous caller was interrupted early
                         FdCompat.closeDescriptor(response.fd);
                         continue;
@@ -292,7 +295,11 @@ public final class FileDescriptorFactory implements Closeable {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
 
-            throw new IOException("Interrupted before completion");
+            // We don't know, how reliable given system's "su" is. It is better to throw FactoryBrokenException
+            // and assume the worst, unless the helper is known to be working already. The other options are
+            // to require TWO retries from user or simply become unreliable in case something goes wrong.
+            if (suAuthPassed.get())
+                throw new IOException("Interrupted before completion");
         }
 
         close();
@@ -319,6 +326,10 @@ public final class FileDescriptorFactory implements Closeable {
                     serverThread.interrupt();
             }
         }
+    }
+
+    public boolean isClosed() {
+        return closedStatus.get();
     }
 
     private final class Server extends Thread {
@@ -358,7 +369,7 @@ public final class FileDescriptorFactory implements Closeable {
             } catch (Exception e) {
                 logException("Server thread forced to quit by error", e);
             } finally {
-                closedStatus.set(true);
+                FdCompat.set(closedStatus);
 
                 try {
                     client.waitFor();
@@ -577,6 +588,10 @@ final class FdCompat {
                 : FdCompat9.libDir(context);
     }
 
+    static void set(AtomicBoolean value) {
+        if (Build.VERSION.SDK_INT < 9) value.set(true); else FdCompat9.set(value);
+    }
+
     static RandomAccessFile convert(FileDescriptor donor) throws IOException {
         final RandomAccessFile raf = new RandomAccessFile("/dev/null", "rw");
         final FileDescriptor recipient = raf.getFD();
@@ -705,6 +720,10 @@ final class FdCompat {
     private static class FdCompat9 {
         public static File libDir(Context context) {
             return new File(context.getApplicationInfo().nativeLibraryDir);
+        }
+
+        public static void set(AtomicBoolean value) {
+            value.lazySet(true);
         }
     }
 }
