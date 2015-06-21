@@ -29,6 +29,8 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A ContentProvider, that runs the helper binary with elevated privileges to serve requests.
@@ -92,14 +94,20 @@ public class RootFileProvider extends BaseProvider {
         try {
             if (fdfactory == null) {
                 synchronized (this) {
-                    fdfactory = FileDescriptorFactory.create(getContext());
+                    if (fdfactory == null) {
+                        fdfactory = FileDescriptorFactory.create(getContext());
+                    }
                 }
             }
 
             // TODO: check entire path for being canonical here
             return fdfactory.open(aFile, parseMode(mode) | FileDescriptorFactory.O_NOFOLLOW);
         } catch (FactoryBrokenException cbe) {
-            fdfactory = null;
+            synchronized (this) {
+                if (fdfactory != null && fdfactory.isClosed()) {
+                    fdfactory = null;
+                }
+            }
 
             Log.e(TAG, "Failed to open a file, is the device even rooted?");
         } catch (Exception anything) {
@@ -148,26 +156,39 @@ public class RootFileProvider extends BaseProvider {
     private static class ThreadInterrupter implements Closeable, CancellationSignal.OnCancelListener {
         private final Thread thread;
         private final CancellationSignal signal;
+        private final Lock lock;
 
         public ThreadInterrupter(CancellationSignal signal) {
             this.signal = signal;
             thread = Thread.currentThread();
+            lock = new ReentrantLock();
 
             if (signal != null)
                 signal.setOnCancelListener(this);
         }
 
         @Override
-        public synchronized void close() throws IOException {
+        public void close() throws IOException {
             if (signal != null) {
+                lock.lock();
+
+                // clear the interruption flag in preparation for thread reuse
+                Thread.interrupted();
+
                 signal.setOnCancelListener(null);
                 signal.throwIfCanceled();
             }
         }
 
         @Override
-        public synchronized void onCancel() {
-            thread.interrupt();
+        public void onCancel() {
+            if (lock.tryLock()) {
+                try {
+                    thread.interrupt();
+                } finally {
+                    lock.unlock();
+                }
+            }
         }
     }
 }
