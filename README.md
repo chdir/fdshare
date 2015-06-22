@@ -76,14 +76,15 @@ repositories {
 }
 ```
 
-Interruption and timeouts
-==========================
+Threading
+==========
+This library is thread-safe.
 
 Opening things with this library may take unpredictable amount of time, depending on countless factors, which are
 impossible to predict in advance (e.g., how long will it take for user to grant a root access via permission
 request dialog?) In order to work around this complication the library uses a 20-second timeout for each call
 to `open`, resulting in FactoryBrokenException if exceeded. It is longer then analogous timeout, used
-for similar reasons by [SuperSu], and should be sufficient for all practical purposes. You can adjust it to
+for similar reasons by [SuperSu][3], and should be sufficient for all practical purposes. You can adjust it to
 your liking by setting system property `FileDescriptorFactory#PRIMARY_TIMEOUT`.
 
 If you want to cancel the call to `open` prematurely, just interrupt the thread, that does it
