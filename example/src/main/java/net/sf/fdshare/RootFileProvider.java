@@ -109,7 +109,7 @@ public class RootFileProvider extends BaseProvider {
     }
 
     @Override
-    ParcelFileDescriptor openDescriptor(String filePath, String mode) throws FileNotFoundException {
+    ParcelFileDescriptor openDescriptor(String filePath, String mode, boolean secure) throws FileNotFoundException {
         final File aFile;
 
         if (TextUtils.isEmpty(filePath) || !(aFile = new File(filePath)).isAbsolute())
@@ -125,7 +125,11 @@ public class RootFileProvider extends BaseProvider {
             }
 
             // TODO: check entire path for being canonical here
-            return fdfactory.open(aFile, parseMode(mode) | FileDescriptorFactory.O_NOFOLLOW);
+            int fdMode = parseMode(mode);
+
+            if (secure) fdMode |= FileDescriptorFactory.O_NOFOLLOW;
+
+            return fdfactory.open(aFile,  fdMode);
         } catch (FactoryBrokenException cbe) {
             synchronized (this) {
                 if (fdfactory != null && fdfactory.isClosed()) {

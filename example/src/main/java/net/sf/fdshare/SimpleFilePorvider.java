@@ -37,7 +37,7 @@ public class SimpleFilePorvider extends BaseProvider {
     public static final String AUTHORITY = ".provider.simple";
 
     @Override
-    ParcelFileDescriptor openDescriptor(String filePath, String mode) throws FileNotFoundException {
+    ParcelFileDescriptor openDescriptor(String filePath, String mode, boolean secure) throws FileNotFoundException {
         File aFile;
 
         if (TextUtils.isEmpty(filePath) || !(aFile = new File(filePath)).isAbsolute())
@@ -48,7 +48,7 @@ public class SimpleFilePorvider extends BaseProvider {
 
         try {
             // TODO: do something about the TOCTOU condition here
-            if (!aFile.equals(aFile.getCanonicalFile()))
+            if (secure && !aFile.equals(aFile.getCanonicalFile()))
                 throw new IllegalArgumentException("Provide a fully resolved canonical path!");
 
             return ParcelFileDescriptor.open(aFile, modeToMode(mode));

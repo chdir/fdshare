@@ -23,6 +23,7 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
@@ -78,7 +79,7 @@ public abstract class BaseProvider extends ContentProvider {
 
     @Override
     public final ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
-        return openDescriptor(uri.getPath(), mode);
+        return openDescriptor(uri.getPath(), mode, true);
     }
 
     @Override
@@ -109,7 +110,7 @@ public abstract class BaseProvider extends ContentProvider {
         return acceptedTypes.isEmpty() ? null : acceptedTypes.toArray(new String[acceptedTypes.size()]);
     }
 
-    abstract ParcelFileDescriptor openDescriptor(String filePath, String mode) throws FileNotFoundException;
+    abstract ParcelFileDescriptor openDescriptor(String filePath, String mode, boolean secure) throws FileNotFoundException;
 
     @SuppressLint("NewApi")
     @NonNull TimestampedMime guessTypeInternal(String filePath) {
@@ -133,7 +134,7 @@ public abstract class BaseProvider extends ContentProvider {
                 types.add(extType2.getMimeType());
         }
 
-        try (ParcelFileDescriptor newFd = openDescriptor(filePath, "r");
+        try (ParcelFileDescriptor newFd = openDescriptor(filePath, "r", false);
              FileInputStream fs = new FileInputStream(newFd.getFileDescriptor()))
         {
             mime.size = newFd.getStatSize();
