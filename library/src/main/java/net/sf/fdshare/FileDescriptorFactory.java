@@ -39,11 +39,13 @@ import java.lang.Process;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.ref.PhantomReference;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.channels.Pipe;
 import java.nio.channels.ReadableByteChannel;
 import java.util.UUID;
 import java.util.concurrent.SynchronousQueue;
@@ -208,9 +210,9 @@ public final class FileDescriptorFactory implements Closeable {
     }
 
     private final AtomicBoolean closedStatus = new AtomicBoolean(false);
-    private final AtomicBoolean suAuthPassed = new AtomicBoolean(false);
     private final SynchronousQueue<FdReq> intake = new SynchronousQueue<>();
     private final SynchronousQueue<FdResp> responses = new SynchronousQueue<>();
+    private PhantomReference f;
 
     private final LocalServerSocket socket;
 
@@ -277,29 +279,18 @@ public final class FileDescriptorFactory implements Closeable {
 
         FdResp response;
         try {
-            if (intake.offer(request, HELPER_TIMEOUT, TimeUnit.MILLISECONDS)) {
-                while ((response = responses.poll(IO_TIMEOUT, TimeUnit.MILLISECONDS)) != null) {
-                    FdCompat.set(suAuthPassed);
-
-                    if (response.request != request) { // cleanup the queue in case previous caller was interrupted early
-                        FdCompat.closeDescriptor(response.fd);
-                        continue;
-                    }
-
-                    if (response.fd != null)
-                        return response.fd;
-                    else
-                        throw new IOException("Failed to open file: " + response.message);
-                }
+            if (intake.offer(request, HELPER_TIMEOUT, TimeUnit.MILLISECONDS)
+                    && (response = responses.poll(IO_TIMEOUT, TimeUnit.MILLISECONDS)) != null
+                    && response.request == request) {
+                if (response.fd != null)
+                    return response.fd;
+                else
+                    throw new IOException("Failed to open file: " + response.message);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
 
-            // We don't know, how reliable given system's "su" is. It is better to throw FactoryBrokenException
-            // and assume the worst, unless the helper is known to be working already. The other options are
-            // to require TWO retries from user or simply become unreliable in case something goes wrong.
-            if (suAuthPassed.get())
-                throw new IOException("Interrupted before completion");
+            throw new IOException("Interrupted before completion");
         }
 
         close();
