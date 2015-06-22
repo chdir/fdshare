@@ -21,7 +21,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.CancellationSignal;
-import android.os.OperationCanceledException;
 import android.os.ParcelFileDescriptor;
 import android.text.TextUtils;
 import android.util.Log;

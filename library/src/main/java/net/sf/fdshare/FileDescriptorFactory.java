@@ -21,8 +21,11 @@ import android.content.Context;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.os.*;
+import android.support.annotation.BinderThread;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
+import android.support.annotation.VisibleForTesting;
+import android.support.annotation.WorkerThread;
 import android.util.Log;
 
 import java.io.Closeable;
@@ -191,6 +194,7 @@ public final class FileDescriptorFactory implements Closeable {
         return BuildConfig.DEBUG ? create(address, command, address) : create(address, "su", "-c", command + ' ' + address);
     }
 
+    @VisibleForTesting
     static FileDescriptorFactory create(String address, String... cmd) throws IOException {
         final FileDescriptorFactory result = new FileDescriptorFactory(address);
 

@@ -17,7 +17,7 @@ idea {
 }
 
 group = 'net.sf.fdshare'
-version = '0.2.1'
+version = '0.2.2'
 
 android {
     compileSdkVersion 21 // mainly for try-with-resources
@@ -133,7 +133,7 @@ task findConventions << {
 dependencies {
     retrolambdaConfig 'net.orfjackal.retrolambda:retrolambda:1.8.0'
 
-    compile 'com.android.support:support-annotations:21.0.0'
+    compile 'com.android.support:support-annotations:22.2.0'
 
     androidTestCompile 'junit:junit:4.11'
     androidTestCompile('com.android.support.test:testing-support-lib:0.1') {

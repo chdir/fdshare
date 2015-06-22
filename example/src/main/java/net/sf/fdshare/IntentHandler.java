@@ -57,13 +57,6 @@ import java.util.Set;
  */
 @SuppressLint("InlinedApi")
 public class IntentHandler extends ContextWrapper {
-    static final String ACTION_FILTER = "net.sf.fdshare.ACTION_FILTER";
-
-    // which flags should be passed to grantUriPermission
-    static final String EXTRA_GRANT_PERMISSION = "net.sf.fdshare.EXTRA_APPROACH";
-    // which Intent was choosen by user
-    static final String EXTRA_TARGET = "net.sf.fdshare.EXTRA_TARGET";
-
     private final String intentAction;
     private final boolean hasRoot;
 
