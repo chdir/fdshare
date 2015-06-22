@@ -21,6 +21,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.CancellationSignal;
+import android.os.OperationCanceledException;
 import android.os.ParcelFileDescriptor;
 import android.text.TextUtils;
 import android.util.Log;
@@ -49,38 +50,61 @@ public class RootFileProvider extends BaseProvider {
     private volatile FileDescriptorFactory fdfactory;
 
     /**
-     * Due to racy implementation of {@link CancellationSignal} the cancellation may never happen or result
-     * in no exception being thrown! The caller of this method is responsible for closing a returned descriptor
-     * in such case.
+     * {@inheritDoc}
+     *
+     * Note, that cancellation is inherently racy. The caller must close whatever descriptor may be returned regardless.
      */
     @Override
     @SuppressLint("NewApi")
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     public ParcelFileDescriptor openFile(Uri uri, String mode, CancellationSignal signal) throws FileNotFoundException {
+        ParcelFileDescriptor result = null;
+
         try (Closeable cancellation = new ThreadInterrupter(signal))
         {
-            return super.openFile(uri, mode);
-        }
-        catch (IOException ioe) {
+            result = super.openFile(uri, mode);
+            return result;
+        } catch (IOException ioe) {
             throw new FileNotFoundException(ioe.getMessage());
+        } finally {
+            if (signal != null && signal.isCanceled()) {
+                if (result != null) {
+                    try { result.close(); } catch (IOException ignored) {}
+                }
+
+                // override whatever exception have resulted from interruption
+                signal.throwIfCanceled();
+            }
         }
     }
 
     /**
-     * Due to racy implementation of {@link CancellationSignal} the cancellation may never happen or result
-     * in no exception being thrown! The caller of this method is responsible for closing a returned Cursor
-     * in such case.
+     * {@inheritDoc}
+     *
+     * Note, that cancellation is inherently racy. The caller must close whatever Cursor may be returned regardless.
      */
     @Override
     @SuppressLint("NewApi")
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal signal) {
+        Cursor result = null;
+
         try (Closeable cancellation = new ThreadInterrupter(signal))
         {
-            return super.query(uri, projection, selection, selectionArgs, sortOrder);
+            result = super.query(uri, projection, selection, selectionArgs, sortOrder);
+            return result;
         }
         catch (IOException ioe) {
             return null;
+        } finally {
+            if (signal != null && signal.isCanceled()) {
+                if (result != null) {
+                    result.close();
+                }
+
+                // override whatever exception have resulted from interruption
+                signal.throwIfCanceled();
+            }
         }
     }
 
@@ -176,7 +200,6 @@ public class RootFileProvider extends BaseProvider {
                 Thread.interrupted();
 
                 signal.setOnCancelListener(null);
-                signal.throwIfCanceled();
             }
         }
 
