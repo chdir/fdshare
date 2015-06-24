@@ -63,7 +63,7 @@ Add following dependency to your `dependencies` block:
 ```groovy
 dependencies {
     ...
-    compile 'net.sf.fdshare:library:0.2.2@aar'
+    compile 'net.sf.fdshare:library:0.2.4@aar'
 }
 ```
 

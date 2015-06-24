@@ -16,25 +16,23 @@
 package net.sf.fdshare;
 
 import android.annotation.TargetApi;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.os.*;
-import android.support.annotation.BinderThread;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.annotation.VisibleForTesting;
-import android.support.annotation.WorkerThread;
 import android.util.Log;
 
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
@@ -42,18 +40,18 @@ import java.lang.Process;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.lang.ref.PhantomReference;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
-import java.nio.channels.Pipe;
 import java.nio.channels.ReadableByteChannel;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -196,38 +194,43 @@ public final class FileDescriptorFactory implements Closeable {
 
     @VisibleForTesting
     static FileDescriptorFactory create(String address, String... cmd) throws IOException {
-        final FileDescriptorFactory result = new FileDescriptorFactory(address);
-
+        // must be created before the process
+        final LocalServerSocket socket = new LocalServerSocket(address);
         try {
             final Process shell = new ProcessBuilder(cmd)
                     .redirectErrorStream(true)
                     .start();
 
-            result.startServer(shell);
+            final FileDescriptorFactory result = new FileDescriptorFactory(shell, socket);
+
+            result.startServer();
 
             return result;
         } catch (Throwable t) {
-            result.close();
+            shut(socket);
 
             throw t;
         }
     }
 
     private final AtomicBoolean closedStatus = new AtomicBoolean(false);
-    private final SynchronousQueue<FdReq> intake = new SynchronousQueue<>();
+    private final ArrayBlockingQueue<FdReq> intake = new ArrayBlockingQueue<>(1);
     private final SynchronousQueue<FdResp> responses = new SynchronousQueue<>();
-    private PhantomReference f;
 
-    private final LocalServerSocket socket;
+    final LocalServerSocket serverSocket;
+    final Process clientProcess;
 
     private volatile Server serverThread;
 
-    private FileDescriptorFactory(String address) throws IOException {
-        this.socket = new LocalServerSocket(address);
+    private FileDescriptorFactory(final Process clientProcess, final LocalServerSocket serverSocket) {
+        this.clientProcess = clientProcess;
+        this.serverSocket = serverSocket;
+
+        intake.offer(FdReq.PLACEHOLDER);
     }
 
-    private void startServer(Process client) throws IOException {
-        serverThread = new Server(client, socket);
+    private void startServer() throws IOException {
+        serverThread = new Server();
         serverThread.start();
     }
 
@@ -281,6 +284,7 @@ public final class FileDescriptorFactory implements Closeable {
 
         final FdReq request = new FdReq(path, mode);
 
+
         FdResp response;
         try {
             if (intake.offer(request, HELPER_TIMEOUT, TimeUnit.MILLISECONDS)
@@ -310,15 +314,16 @@ public final class FileDescriptorFactory implements Closeable {
     @Override
     public void close() {
         if (!closedStatus.compareAndSet(false, true)) {
-            intake.offer(FdReq.STOP);
+            shut(clientProcess);
+            shut(serverSocket);
 
-            try {
-                socket.close();
-            } catch (IOException e) {
-                logException("Failed to close server socket", e);
-            } finally {
-                if (serverThread != null)
-                    serverThread.interrupt();
+            if (serverThread != null) {
+                serverThread.interrupt();
+
+                do {
+                    intake.clear();
+                }
+                while (!intake.offer(FdReq.STOP));
             }
         }
     }
@@ -328,27 +333,21 @@ public final class FileDescriptorFactory implements Closeable {
     }
 
     private final class Server extends Thread {
-        private final Process client;
-        private final LocalServerSocket serverSocket;
-
         private final ByteBuffer statusMsg = ByteBuffer.allocate(512).order(ByteOrder.nativeOrder());
 
         int lastClientReadCount;
 
-        Server(Process client, LocalServerSocket serverSocket) throws IOException {
+        Server() throws IOException {
             super("fd receiver");
-
-            this.client = client;
-            this.serverSocket = serverSocket;
         }
 
         @Override
         public void run() {
-            try (ReadableByteChannel clientOutput = Channels.newChannel(client.getInputStream());
+            try (ReadableByteChannel clientOutput = Channels.newChannel(clientProcess.getInputStream());
                  Closeable c = new CloseableSocket(serverSocket))
             {
                 try {
-                    initializeAndHandleRequests(readHelperPid(clientOutput), serverSocket);
+                    initializeAndHandleRequests(readHelperPid(clientOutput));
                 } finally {
                     try {
                         do {
@@ -367,7 +366,9 @@ public final class FileDescriptorFactory implements Closeable {
                 FdCompat.set(closedStatus);
 
                 try {
-                    client.waitFor();
+                    setName("BUG: Waiting for su process, which won't quit");
+
+                    clientProcess.waitFor();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -389,9 +390,9 @@ public final class FileDescriptorFactory implements Closeable {
             return Integer.valueOf(m.group(1));
         }
 
-        private void initializeAndHandleRequests(int helperPid, LocalServerSocket socket) throws Exception {
+        private void initializeAndHandleRequests(int helperPid) throws Exception {
             while (!isInterrupted()) {
-                try (LocalSocket localSocket = socket.accept())
+                try (LocalSocket localSocket = serverSocket.accept())
                 {
                     final int socketPid = localSocket.getPeerCredentials().getPid();
                     if (socketPid != helperPid)
@@ -430,6 +431,9 @@ public final class FileDescriptorFactory implements Closeable {
                                 }
                             }
 
+                            if (intake.take() == FdReq.STOP)
+                                return;
+
                             processRequestsUntilStopped(localSocket, status, clientTty);
 
                             break;
@@ -442,7 +446,7 @@ public final class FileDescriptorFactory implements Closeable {
         private void processRequestsUntilStopped(LocalSocket fdrecv, ReadableByteChannel status, Writer control) throws IOException, InterruptedException {
             FdReq fileOps;
 
-            while ((fileOps = intake.take()) != FdReq.STOP) {
+            while ((fileOps = intake.poll()) != FdReq.STOP) {
                 FdResp response = null;
 
                 try {
@@ -511,8 +515,40 @@ public final class FileDescriptorFactory implements Closeable {
         }
     }
 
+    private static void shut(Closeable closeable) {
+        try {
+            if (closeable != null)
+                closeable.close();
+        } catch (IOException e) {
+            // just as planned
+        }
+    }
+
+    private static void shut(LocalServerSocket sock) {
+        try {
+            if (sock != null)
+                sock.close();
+        } catch (IOException e) {
+            logException("Failed to close server socket", e);
+        }
+    }
+
+    private static void shut(Process proc) {
+        try {
+            if (proc != null) {
+                shut(proc.getInputStream());
+                shut(proc.getOutputStream());
+                proc.destroy();
+            }
+        } catch (Exception e) {
+            // just as planned
+        }
+    }
+
     private static final class FdReq {
         static FdReq STOP = new FdReq(null, 0);
+
+        static FdReq PLACEHOLDER = new FdReq(null, 0);
 
         final String fileName;
         final int mode;

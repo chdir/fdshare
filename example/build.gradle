@@ -48,7 +48,7 @@ dependencies {
         compile project(':library')
     } else {
         debugCompile project(path: ':library', configuration: 'debug')
-        releaseCompile 'net.sf.fdshare:library:0.2.1@aar'
+        releaseCompile 'net.sf.fdshare:library:0.2.4@aar'
     }
 
     compile 'com.j256.simplemagic:simplemagic:1.6'

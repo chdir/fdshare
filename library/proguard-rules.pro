@@ -23,9 +23,5 @@
     public *;
 }
 
--assumenosideeffects class * {
-    !public !private static FileDescriptorFactory createTest(android.content.Context);
-}
-
 # Retrolambda, per https://github.com/evant/gradle-retrolambda
 -dontwarn java.lang.invoke.*
