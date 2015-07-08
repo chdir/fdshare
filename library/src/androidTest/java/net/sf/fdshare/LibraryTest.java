@@ -7,10 +7,12 @@ import android.support.test.InstrumentationRegistry;
 import android.support.test.runner.AndroidJUnit4;
 import android.test.FlakyTest;
 import junit.framework.Assert;
+import net.sf.fdshare.internal.FdCompat;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
@@ -90,5 +92,12 @@ public class LibraryTest {
 
         //noinspection ResultOfMethodCallIgnored
         tmpFile.delete();
+    }
+
+    @Test
+    public void testAbleToResolveFilePath() throws IOException {
+        try (ParcelFileDescriptor fd = ParcelFileDescriptor.open(exec, ParcelFileDescriptor.MODE_READ_ONLY)) {
+            Assert.assertEquals(exec.getAbsolutePath(), FdCompat.getFdPath(fd));
+        }
     }
 }

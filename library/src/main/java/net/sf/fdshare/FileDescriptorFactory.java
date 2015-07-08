@@ -15,7 +15,6 @@
  */
 package net.sf.fdshare;
 
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
@@ -24,15 +23,13 @@ import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.annotation.VisibleForTesting;
 import android.util.Log;
+import net.sf.fdshare.internal.FdCompat;
 
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileDescriptor;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
@@ -40,18 +37,15 @@ import java.lang.Process;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Condition;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -446,7 +440,7 @@ public final class FileDescriptorFactory implements Closeable {
         private void processRequestsUntilStopped(LocalSocket fdrecv, ReadableByteChannel status, Writer control) throws IOException, InterruptedException {
             FdReq fileOps;
 
-            while ((fileOps = intake.poll()) != FdReq.STOP) {
+            while ((fileOps = intake.take()) != FdReq.STOP) {
                 FdResp response = null;
 
                 try {
@@ -592,169 +586,6 @@ public final class FileDescriptorFactory implements Closeable {
         @Override
         public void close() throws IOException {
             lss.close();
-        }
-    }
-}
-
-/**
- * A number of compatibility/reflection hacks, that should be relatively safe against
- * most future platform changes
- */
-final class FdCompat {
-    static ParcelFileDescriptor adopt(FileDescriptor fd) throws IOException {
-        return Build.VERSION.SDK_INT < 13 ? createFdInternal(fd) : FdCompat13.createFdInternal(fd);
-    }
-
-    static int getIntFd(ParcelFileDescriptor fd) throws IOException {
-        return Build.VERSION.SDK_INT < 12 ? getIntFdInternal(fd) : FdCompat13.getIntFd(fd);
-    }
-
-    static ParcelFileDescriptor adopt(int fd) throws IOException {
-        return Build.VERSION.SDK_INT < 13 ? createFdInternal(fd) : FdCompat13.createFdInternal(fd);
-    }
-
-    static File libDir(Context context) {
-        return Build.VERSION.SDK_INT < 9
-                ? new File(context.getApplicationInfo().dataDir, "lib")
-                : FdCompat9.libDir(context);
-    }
-
-    static void set(AtomicBoolean value) {
-        if (Build.VERSION.SDK_INT < 9) value.set(true); else FdCompat9.set(value);
-    }
-
-    static RandomAccessFile convert(FileDescriptor donor) throws IOException {
-        final RandomAccessFile raf = new RandomAccessFile("/dev/null", "rw");
-        final FileDescriptor recipient = raf.getFD();
-
-        // close the /dev/null fd
-        closeKernelFd(recipient);
-        cloneDescriptorGutsInternal(donor, recipient);
-
-        return raf;
-    }
-
-    // _never_ forget that anything ever opened corresponds to entry in the kernel table
-    private static void closeKernelFd(FileDescriptor untouchable) {
-        try {
-            final FileDescriptor tempHolder = new FileDescriptor();
-            cloneDescriptorGutsInternal(untouchable, tempHolder);
-            closeDescriptor(tempHolder);
-        } catch (Exception ohWell) {
-            ohWell.printStackTrace();
-        }
-    }
-
-    // classic Java FileDescriptor does not provide saner way to close itself, so...
-    static void closeDescriptor(FileDescriptor fd) {
-        if (fd != null)
-            try {
-                new FileInputStream(fd).close();
-            } catch (IOException ignore) {}
-    }
-
-    // on older platforms we have to rely on the unspoken assumptions, reflection and hacks
-    private static Field integerField;
-
-    private static void readCachedField() throws NoSuchFieldException {
-        if (integerField == null) {
-            integerField = FileDescriptor.class.getDeclaredField("descriptor");
-            integerField.setAccessible(true);
-        }
-    }
-
-    private static ParcelFileDescriptor createFdInternal(FileDescriptor donor) throws IOException {
-        try {
-            // just construct a ParcelFileDescriptor _somehow_
-            final ParcelFileDescriptor result = ParcelFileDescriptor.open(new File("/dev/null"),
-                    ParcelFileDescriptor.MODE_READ_WRITE);
-
-            final FileDescriptor targetOfTransplantation = result.getFileDescriptor();
-
-            // close the /dev/null fd
-            closeKernelFd(targetOfTransplantation);
-            cloneDescriptorGutsInternal(donor, targetOfTransplantation);
-
-            return result;
-        } catch (Exception e) {
-            throw new IOException("Can not obtain descriptor on this Android version: " + e.getMessage());
-        }
-    }
-
-    private static int getIntFdInternal(ParcelFileDescriptor fd) throws IOException {
-        try {
-            readCachedField();
-
-            return integerField.getInt(fd.getFileDescriptor());
-        } catch (Exception e) {
-            throw new IOException("Can not obtain integer descriptor on this Android version: " + e.getMessage());
-        }
-    }
-
-    private static ParcelFileDescriptor createFdInternal(int value) throws IOException {
-        try {
-            readCachedField();
-
-            final FileDescriptor d = new FileDescriptor();
-            integerField.setInt(d, value);
-
-            return createFdInternal(d);
-        } catch (Exception e) {
-            throw new IOException("Can not obtain ParcelFileDescriptor on this Android version: " + e.getMessage());
-        }
-    }
-
-    private static void cloneDescriptorGutsInternal(FileDescriptor donor, FileDescriptor recipient) throws IOException {
-        try {
-            readCachedField();
-
-            integerField.setInt(recipient, integerField.getInt(donor));
-        } catch (Exception e) {
-            cloneGutsHardWayInternal(donor, recipient);
-        }
-    }
-
-    // just in case
-    private static <T> void cloneGutsHardWayInternal(T donor, T recipient) throws IOException {
-        final Class<?> clazz = donor.getClass();
-        try {
-            final Field[] f = clazz.getDeclaredFields();
-            for (Field ff:f) {
-                ff.setAccessible(true);
-                ff.set(recipient, ff.get(donor));
-            }
-        } catch (IllegalAccessException e) {
-            throw new IOException("failed to perform reflective cloning of " + clazz.getName());
-        }
-    }
-
-    @TargetApi(13)
-    private static class FdCompat13 {
-        static ParcelFileDescriptor createFdInternal(FileDescriptor fd) throws IOException {
-            final ParcelFileDescriptor result = ParcelFileDescriptor.dup(fd);
-
-            closeDescriptor(fd);
-
-            return result;
-        }
-
-        static int getIntFd(ParcelFileDescriptor descriptor) {
-            return descriptor.getFd();
-        }
-
-        static ParcelFileDescriptor createFdInternal(int fd) {
-            return ParcelFileDescriptor.adoptFd(fd);
-        }
-    }
-
-    @TargetApi(9)
-    private static class FdCompat9 {
-        public static File libDir(Context context) {
-            return new File(context.getApplicationInfo().nativeLibraryDir);
-        }
-
-        public static void set(AtomicBoolean value) {
-            value.lazySet(true);
         }
     }
 }

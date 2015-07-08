@@ -17,7 +17,7 @@ idea {
 }
 
 group = 'net.sf.fdshare'
-version = '0.2.4'
+version = '0.2.5'
 
 android {
     compileSdkVersion 21 // mainly for try-with-resources
