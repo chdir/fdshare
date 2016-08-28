@@ -1,3 +1,12 @@
+| Branch | Build Status                                        |
+| ------ |:----------------------------------------------------|
+| Master | [![Master Build status][master build]][travis link] |
+| Dev    | [![Dev Build status][dev build]][travis link]       |
+
+[travis link]: https://travis-ci.org/chdir/aidl2
+[master build]: https://travis-ci.org/chdir/fdshare.svg?branch=master
+[dev build]: https://travis-ci.org/chdir/fdshare.svg?branch=dev
+
 This is a source code of implementation of an open server for Android (aka fdshare).
 
 Preface

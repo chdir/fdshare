@@ -1,19 +1,37 @@
 #!/bin/bash -x
-ls -alh crystax-ndk-10.1.0 || true
 
-#if [ ! -f crystax-ndk-10.1.0 ]; then
-
-df -hu
+if [ ! -f crystax-ndk-10.3.2 ]; then
+ df -h .
 
  if [ `uname -m` = x86_64 ]; then
-	NDK_URL=https://www.crystax.net/download/crystax-ndk-10.1.0-linux-x86_64.tar.bz2;
+	NDK_URL=https://www.crystax.net/download/crystax-ndk-10.3.2-linux-x86_64.tar.xz;
  else
-	NDK_URL=https://www.crystax.net/download/crystax-ndk-10.1.0-linux-x86.tar.bz2;
+	NDK_URL=https://www.crystax.net/download/crystax-ndk-10.3.2-linux-x86.tar.xz;
  fi
 
- wget -qO- "$NDK_URL" | tar xvjf - crystax-ndk-10.1.0 --exclude=crystax-ndk-10.1.0/docs --exclude=crystax-ndk-10.1.0/sources --exclude=crystax-ndk-10.1.0/samples --exclude=crystax-ndk-10.1.0/tests --exclude=crystax-ndk-10.1.0/build --exclude=crystax-ndk-10.1.0/toolchains/renderscript --exclude=crystax-ndk-10.1.0/toolchains/x86_64-* --exclude=crystax-ndk-10.1.0/toolchains/llvm-* --exclude=crystax-ndk-10.1.0/toolchains/aarch64-* --exclude=crystax-ndk-10.1.0/toolchains/mips64el-*
+ trap "rm -f tarpipe" EXIT
 
- ls -alh crystax-ndk-10.1.0 || true
-#fi
+ mkfifo tarpipe
 
-echo ndk.dir=`pwd`/crystax-ndk-10.1.0 > local.properties
+ set +x
+
+ wget -v --no-check-certificate --progress=dot:giga -O tarpipe "$NDK_URL" 2>&1 | while IFS='' read -r line; do printf "\n%s" "$line"; done &
+
+ tar --get --xz --checkpoint=3000 --file=tarpipe crystax-ndk-10.3.2 \
+	--exclude=crystax-ndk-10.3.2/docs \
+	--exclude=crystax-ndk-10.3.2/samples \
+	--exclude=crystax-ndk-10.3.2/tests \
+	--exclude=crystax-ndk-10.3.2/toolchains/renderscript \
+	--exclude=crystax-ndk-10.3.2/toolchains/x86_64-* \
+	--exclude=crystax-ndk-10.3.2/toolchains/llvm-* \
+	--exclude=crystax-ndk-10.3.2/toolchains/aarch64-* \
+	--exclude=crystax-ndk-10.3.2/toolchains/mips64el-* 2>&1 | while IFS='' read -r line; do printf "\t\n%s" "$line"; done
+
+ printf "\n"
+
+ set -x
+
+ ls crystax-ndk-10.3.2 | wc -l
+fi
+
+echo ndk.dir=`pwd`/crystax-ndk-10.3.2 > local.properties
